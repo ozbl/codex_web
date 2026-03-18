@@ -4,8 +4,12 @@
 
 ## 界面预览
 
-<img src="light.jpg" alt="浅色模式预览" height="420" />
-<img src="night.jpg" alt="深色模式预览" height="420" />
+<table>
+  <tr>
+    <td><img src="light.jpg" alt="浅色模式预览" height="420" /></td>
+    <td><img src="night.jpg" alt="深色模式预览" height="420" /></td>
+  </tr>
+</table>
 
 ## 功能
 
