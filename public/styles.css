@@ -210,7 +210,15 @@ label span {
 }
 
 .topbar-tools {
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.topbar-tools-group {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .topbar-info {
@@ -231,8 +239,8 @@ label span {
   border-color: var(--line-strong);
 }
 
-.topbar-tab span {
-  display: none;
+.topbar-tab .topbar-badge {
+  display: inline-flex;
 }
 
 .topbar-badge {
@@ -273,12 +281,21 @@ label span {
 }
 
 .square-btn {
-  width: 46px;
-  min-width: 46px;
-  height: 46px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
   padding: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   flex: 0 0 auto;
+  flex-direction: column;
+  gap: 0;
+}
+
+.topbar-tools .square-btn {
+  width: 100%;
+  min-width: 0;
+  padding: 3px 8px;
+  gap: 2px;
 }
 
 .mini-btn {
@@ -286,6 +303,17 @@ label span {
   min-width: 40px;
   height: 40px;
   border-radius: 12px;
+}
+
+.tool-label {
+  display: inline-block;
+  max-width: 100%;
+  font-size: 8px;
+  line-height: 1;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .popup-window {
@@ -502,52 +530,41 @@ label span {
   min-height: 40px;
 }
 
-.terminal-session {
+.terminal-heading {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.terminal-toolbar-title {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-
-.terminal-session strong {
-  min-width: 0;
-  font-size: 15px;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 .terminal-section-label {
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.terminal-inline-chip {
+  font-size: 10px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  justify-self: start;
 }
 
 .terminal-mini-actions {
   gap: 8px;
   flex-wrap: nowrap;
-}
-
-.terminal-frame {
-  flex: 1;
-  min-height: 0;
-  border-radius: 24px;
-  border: 1px solid var(--terminal-border);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 30%),
-    var(--terminal-bg);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.terminal-dots {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--terminal-border);
 }
 
 .terminal-dots-lights {
@@ -567,6 +584,19 @@ label span {
 .terminal-dots-lights span:nth-child(2) { background: #fbbf24; }
 .terminal-dots-lights span:nth-child(3) { background: #4ade80; }
 
+.terminal-frame {
+  flex: 1;
+  min-height: 0;
+  border-radius: 24px;
+  border: 1px solid var(--terminal-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 30%),
+    var(--terminal-bg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 #terminal {
   flex: 1;
   min-height: 0;
@@ -575,6 +605,23 @@ label span {
 
 #terminal .xterm {
   height: 100%;
+}
+
+#terminal .xterm .xterm-helpers {
+  z-index: 12;
+}
+
+#terminal .xterm .xterm-helper-textarea {
+  left: 0 !important;
+  top: 0 !important;
+  width: 1px !important;
+  height: 1.4em !important;
+  opacity: 0.01 !important;
+  z-index: 12 !important;
+}
+
+#terminal .xterm .composition-view {
+  z-index: 13 !important;
 }
 
 #terminal .xterm-viewport {
@@ -619,7 +666,7 @@ label span {
 
 @media (max-width: 1180px) {
   .topbar-tools {
-    justify-content: flex-start;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .topbar-info {
@@ -641,7 +688,7 @@ label span {
   }
 
   .topbar-tools {
-    justify-content: flex-start;
+    grid-template-columns: 1fr;
   }
 
   .popup-window,
@@ -678,6 +725,12 @@ label span {
 
   .topbar-tools {
     display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .topbar-tools-group {
+    display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
   }
@@ -712,17 +765,12 @@ label span {
     min-height: 36px;
   }
 
-  .terminal-session {
-    flex: 1 1 auto;
-    min-width: 0;
-    gap: 8px;
+  .terminal-heading {
+    gap: 4px;
   }
 
-  .terminal-session strong {
-    font-size: 14px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .terminal-toolbar-title {
+    gap: 6px;
   }
 
   .status-pill {
@@ -731,11 +779,6 @@ label span {
 
   .terminal-mini-actions {
     align-self: start;
-  }
-
-  .terminal-dots {
-    gap: 10px;
-    padding: 12px;
   }
 
   .terminal-frame {

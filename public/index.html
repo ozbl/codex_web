@@ -17,40 +17,43 @@
       <main class="main-shell">
         <header class="topbar surface">
           <div class="topbar-tools">
-            <button id="consolePanelBtn" class="topbar-tab icon-btn ghost square-btn is-active" type="button" title="控制台" aria-label="控制台">
-              <i class="fa-solid fa-terminal" aria-hidden="true"></i>
-              <span>控制台</span>
-            </button>
-            <button id="sessionsPanelBtn" class="topbar-tab icon-btn ghost square-btn" type="button" title="会话" aria-label="会话">
-              <i class="fa-regular fa-window-restore" aria-hidden="true"></i>
-              <span id="sessionsBadge" class="topbar-badge">0</span>
-              <span>会话</span>
-            </button>
-            <button id="connectionsPanelBtn" class="topbar-tab icon-btn ghost square-btn" type="button" title="连接" aria-label="连接">
-              <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
-              <span>连接</span>
-            </button>
-            <button id="fileTreePanelBtn" class="topbar-tab icon-btn ghost square-btn" type="button" title="文件树" aria-label="文件树">
-              <i class="fa-solid fa-folder-tree" aria-hidden="true"></i>
-              <span>文件树</span>
-            </button>
-            <button id="newShellBtn" class="icon-btn ghost square-btn" type="button" aria-label="新建 PowerShell 会话" title="新建会话">
-              <i class="fa-solid fa-square-plus" aria-hidden="true"></i>
-            </button>
-            <button id="createBtn" class="icon-btn square-btn" type="button" aria-label="在当前会话运行 Codex" title="进入 Codex">
-              <i class="fa-solid fa-play" aria-hidden="true"></i>
-            </button>
-            <button id="refreshBtn" class="icon-btn ghost square-btn" type="button" aria-label="刷新会话列表" title="刷新会话">
-              <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
-            </button>
-            <button id="themeToggleBtn" class="icon-btn ghost square-btn" type="button" aria-label="切换主题" title="切换主题">
-              <i id="themeToggleIcon" class="fa-regular fa-moon" aria-hidden="true"></i>
-            </button>
-          </div>
-
-          <div class="topbar-info">
-            <span class="root-hint">根目录</span>
-            <strong id="rootDirStat" class="root-dir-text">-</strong>
+            <div class="topbar-tools-group">
+              <button id="consolePanelBtn" class="topbar-tab icon-btn ghost square-btn is-active" type="button" title="控制台" aria-label="控制台" data-label="控制台">
+                <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                <span class="tool-label">控制台</span>
+              </button>
+              <button id="sessionsPanelBtn" class="topbar-tab icon-btn ghost square-btn" type="button" title="会话" aria-label="会话" data-label="会话">
+                <i class="fa-regular fa-window-restore" aria-hidden="true"></i>
+                <span id="sessionsBadge" class="topbar-badge">0</span>
+                <span class="tool-label">会话</span>
+              </button>
+              <button id="connectionsPanelBtn" class="topbar-tab icon-btn ghost square-btn" type="button" title="连接" aria-label="连接" data-label="连接">
+                <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
+                <span class="tool-label">连接</span>
+              </button>
+              <button id="fileTreePanelBtn" class="topbar-tab icon-btn ghost square-btn" type="button" title="文件树" aria-label="文件树" data-label="文件树">
+                <i class="fa-solid fa-folder-tree" aria-hidden="true"></i>
+                <span class="tool-label">文件树</span>
+              </button>
+            </div>
+            <div class="topbar-tools-group">
+              <button id="newShellBtn" class="icon-btn ghost square-btn" type="button" aria-label="新建 PowerShell 会话" title="新建会话" data-label="新建">
+                <i class="fa-solid fa-square-plus" aria-hidden="true"></i>
+                <span class="tool-label">新建</span>
+              </button>
+              <button id="createBtn" class="icon-btn square-btn" type="button" aria-label="在当前会话运行 Codex" title="进入 Codex" data-label="运行">
+                <i class="fa-solid fa-play" aria-hidden="true"></i>
+                <span class="tool-label">运行</span>
+              </button>
+              <button id="refreshBtn" class="icon-btn ghost square-btn" type="button" aria-label="刷新会话列表" title="刷新会话" data-label="刷新">
+                <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                <span class="tool-label">刷新</span>
+              </button>
+              <button id="themeToggleBtn" class="icon-btn ghost square-btn" type="button" aria-label="切换主题" title="切换主题" data-label="主题">
+                <i id="themeToggleIcon" class="fa-regular fa-moon" aria-hidden="true"></i>
+                <span class="tool-label">主题</span>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -185,7 +188,17 @@
 
         <section class="surface terminal-stage">
           <div class="terminal-toolbar">
-            <span class="terminal-section-label">Terminal</span>
+            <div class="terminal-heading">
+              <div class="terminal-toolbar-title">
+                <div class="terminal-dots-lights">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <span class="terminal-section-label">Terminal</span>
+              </div>
+              <span id="sessionMetaLabel" class="status terminal-inline-chip">未连接 · 空闲</span>
+            </div>
             <div class="actions terminal-mini-actions">
               <button id="ctrlCBtn" class="ghost square-btn mini-btn" type="button" aria-label="发送 Ctrl+C" title="发送 Ctrl+C">
                 <i class="fa-solid fa-ban" aria-hidden="true"></i>
@@ -197,17 +210,6 @@
           </div>
 
           <div class="terminal-frame">
-            <div class="terminal-dots">
-              <div class="terminal-dots-lights">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-              <div class="terminal-session">
-                <strong id="currentSessionLabel">未连接会话</strong>
-                <span id="statusLabel" class="status status-pill">空闲</span>
-              </div>
-            </div>
             <div id="terminal"></div>
           </div>
         </section>

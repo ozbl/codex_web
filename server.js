@@ -11,6 +11,10 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ noServer: true });
 
+function staticNoCache(res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+}
+
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number.parseInt(process.env.PORT || "3100", 10);
 const SESSION_TTL_MS = Number.parseInt(
@@ -28,18 +32,18 @@ const MAX_SESSIONS = Number.parseInt(process.env.MAX_SESSIONS || "8", 10);
 const sessions = new Map();
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), { setHeaders: staticNoCache }));
 app.use(
   "/vendor/xterm",
-  express.static(path.join(__dirname, "node_modules", "@xterm", "xterm")),
+  express.static(path.join(__dirname, "node_modules", "@xterm", "xterm"), { setHeaders: staticNoCache }),
 );
 app.use(
   "/vendor/xterm-addon-fit",
-  express.static(path.join(__dirname, "node_modules", "@xterm", "addon-fit")),
+  express.static(path.join(__dirname, "node_modules", "@xterm", "addon-fit"), { setHeaders: staticNoCache }),
 );
 app.use(
   "/vendor/fontawesome",
-  express.static(path.join(__dirname, "node_modules", "@fortawesome", "fontawesome-free")),
+  express.static(path.join(__dirname, "node_modules", "@fortawesome", "fontawesome-free"), { setHeaders: staticNoCache }),
 );
 
 function parseArgString(input) {

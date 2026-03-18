@@ -52,6 +52,7 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById("terminal"));
 fitAddon.fit();
 term.focus();
+configureImeSupport();
 
 const els = {
   panelBackdrop: document.getElementById("panelBackdrop"),
@@ -82,8 +83,7 @@ const els = {
   sessionCount: document.getElementById("sessionCount"),
   sidebarSessionCount: document.getElementById("sidebarSessionCount"),
   addressList: document.getElementById("addressList"),
-  currentSessionLabel: document.getElementById("currentSessionLabel"),
-  statusLabel: document.getElementById("statusLabel"),
+  sessionMetaLabel: document.getElementById("sessionMetaLabel"),
   rootDirStat: document.getElementById("rootDirStat"),
   themeToggleBtn: document.getElementById("themeToggleBtn"),
   themeToggleIcon: document.getElementById("themeToggleIcon"),
@@ -111,6 +111,55 @@ let currentFileTreePath = null;
 let currentFileTreeParent = null;
 let activeWorkspaceView = "console";
 let openPanel = null;
+let desktopImeText = "";
+let desktopImeComposing = false;
+
+function setNodeText(node, value) {
+  if (node) {
+    node.textContent = value;
+  }
+}
+
+function configureImeSupport() {
+  if (!term.textarea) {
+    return;
+  }
+  term.textarea.setAttribute("inputmode", "text");
+  term.textarea.setAttribute("autocapitalize", "off");
+  term.textarea.setAttribute("autocomplete", "off");
+  term.textarea.setAttribute("spellcheck", "false");
+  term.textarea.setAttribute("lang", "zh-CN");
+
+  if (window.matchMedia("(pointer: coarse)").matches) {
+    return;
+  }
+
+  term.textarea.addEventListener("compositionstart", () => {
+    desktopImeComposing = true;
+    desktopImeText = "";
+  });
+
+  term.textarea.addEventListener("compositionupdate", (event) => {
+    desktopImeText = event.data || term.textarea.value || "";
+  });
+
+  term.textarea.addEventListener("compositionend", (event) => {
+    desktopImeComposing = false;
+    const committedText = event.data || term.textarea.value || desktopImeText;
+    desktopImeText = "";
+    if (!committedText) {
+      return;
+    }
+    setTimeout(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        sendTerminalInput(committedText);
+      }
+      if (term.textarea) {
+        term.textarea.value = "";
+      }
+    }, 0);
+  });
+}
 
 function loadThemePreference() {
   const saved = localStorage.getItem(THEME_KEY);
@@ -155,8 +204,8 @@ function closePanels() {
 function openWorkspacePanel(view) {
   activeWorkspaceView = view;
   const heading = workspaceTitles[view];
-  els.workspacePopupEyebrow.textContent = heading.eyebrow;
-  els.workspacePopupTitle.textContent = heading.title;
+  setNodeText(els.workspacePopupEyebrow, heading.eyebrow);
+  setNodeText(els.workspacePopupTitle, heading.title);
   for (const item of els.popupNavItems) {
     item.classList.toggle("is-active", item.dataset.view === view);
   }
@@ -187,7 +236,8 @@ function getToken() {
 }
 
 function setStatus(text) {
-  els.statusLabel.textContent = text;
+  const sessionPrefix = currentSession ? currentSession.id.slice(0, 8) : "未连接";
+  setNodeText(els.sessionMetaLabel, `${sessionPrefix} · ${text}`);
 }
 
 function apiHeaders() {
@@ -203,7 +253,6 @@ function setActiveSession(session) {
   currentSession = session || null;
   currentSessionId = session?.id || null;
   if (session) {
-    els.currentSessionLabel.textContent = `${session.id.slice(0, 8)} · ${session.cwd}`;
     setStatus(session.status === "running" ? "运行中" : `已退出 (${session.exitCode ?? "-"})`);
     if (session.cwd) {
       els.cwdInput.value = session.cwd;
@@ -212,7 +261,6 @@ function setActiveSession(session) {
       });
     }
   } else {
-    els.currentSessionLabel.textContent = "未连接会话";
     setStatus("空闲");
   }
   els.ctrlCBtn.disabled = !session || session.status !== "running";
@@ -288,7 +336,6 @@ function updateCurrentSessionCwd(cwd) {
     return;
   }
   currentSession.cwd = cwd;
-  els.currentSessionLabel.textContent = `${currentSession.id.slice(0, 8)} · ${cwd}`;
 }
 
 function syncShellCwd(cwd) {
@@ -343,7 +390,7 @@ function renderDirectoryItems(container, payload, { includeFiles, onDirectoryCli
   if (payload.directories.length === 0 && (!includeFiles || payload.files.length === 0)) {
     const empty = document.createElement("div");
     empty.className = "file-tree-empty";
-    empty.textContent = "当前目录为空。";
+    setNodeText(empty, "当前目录为空。");
     container.appendChild(empty);
     return;
   }
@@ -389,7 +436,7 @@ function renderDirectoryItems(container, payload, { includeFiles, onDirectoryCli
 async function loadDirectories(targetPath) {
   const payload = await fetchDirectoryPayload(targetPath);
   currentDirectoryBrowserPath = payload.current;
-  els.directoryCurrentPath.textContent = payload.current;
+  setNodeText(els.directoryCurrentPath, payload.current);
   els.dirUpBtn.disabled = !payload.parent;
   renderDirectoryItems(els.directoryList, payload, {
     includeFiles: false,
@@ -405,7 +452,7 @@ async function loadFileTree(targetPath) {
   currentFileTreePath = payload.current;
   currentFileTreeParent = payload.parent;
   els.cwdInput.value = payload.current;
-  els.fileTreeCurrentPath.textContent = payload.current;
+  setNodeText(els.fileTreeCurrentPath, payload.current);
   els.fileTreeUpBtn.disabled = !payload.parent;
   renderDirectoryItems(els.fileTreeList, payload, {
     includeFiles: true,
@@ -423,19 +470,22 @@ function renderAddresses(addresses) {
   for (const address of list) {
     const item = document.createElement("div");
     item.className = "address-item";
-    item.textContent = address.includes(":") && !address.includes(".")
-      ? `http://${address}`
-      : address.startsWith("127.0.0.1")
+    setNodeText(
+      item,
+      address.includes(":") && !address.includes(".")
         ? `http://${address}`
-        : `http://${address}:${config.port}`;
+        : address.startsWith("127.0.0.1")
+          ? `http://${address}`
+          : `http://${address}:${config.port}`
+    );
     els.addressList.appendChild(item);
   }
 }
 
 function renderSessions(sessions) {
-  els.sessionCount.textContent = String(sessions.length);
-  els.sidebarSessionCount.textContent = String(sessions.length);
-  els.sessionsBadge.textContent = String(sessions.length);
+  setNodeText(els.sessionCount, String(sessions.length));
+  setNodeText(els.sidebarSessionCount, String(sessions.length));
+  setNodeText(els.sessionsBadge, String(sessions.length));
   els.sidebarSessionList.innerHTML = "";
 
   if (sessions.length === 0) {
@@ -543,6 +593,9 @@ function attachSession(session) {
 }
 
 term.onData((data) => {
+  if (desktopImeComposing) {
+    return;
+  }
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: "input", data }));
   }
@@ -564,8 +617,8 @@ async function loadConfig() {
   config = await requestJson("/api/config");
   els.cwdInput.value = config.defaultCwd;
   els.argsInput.value = "";
-  els.rootDirStat.textContent = config.rootDir;
-  els.configHint.textContent = `允许根目录: ${config.rootDir}。默认会自动附加参数: ${config.defaultArgs || "(无)"}`;
+  setNodeText(els.rootDirStat, config.rootDir);
+  setNodeText(els.configHint, `允许根目录: ${config.rootDir}。默认会自动附加参数: ${config.defaultArgs || "(无)"}`);
   renderAddresses(config.addresses || []);
   await loadFileTree(config.defaultCwd);
 }
