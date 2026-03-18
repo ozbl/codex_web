@@ -113,6 +113,7 @@ let activeWorkspaceView = "console";
 let openPanel = null;
 let desktopImeText = "";
 let desktopImeComposing = false;
+let desktopImeRecentlyHandled = false;
 
 function setNodeText(node, value) {
   if (node) {
@@ -134,6 +135,38 @@ function configureImeSupport() {
     return;
   }
 
+  const clearImeTextarea = () => {
+    if (term.textarea) {
+      term.textarea.value = "";
+    }
+  };
+
+  const forwardImeText = (text) => {
+    if (!text) {
+      return;
+    }
+    desktopImeRecentlyHandled = true;
+    sendTerminalInput(text);
+    clearImeTextarea();
+    setTimeout(() => {
+      desktopImeRecentlyHandled = false;
+    }, 30);
+  };
+
+  term.textarea.addEventListener("beforeinput", (event) => {
+    const inputEvent = event;
+    const text = inputEvent.data || "";
+    const isInsert = String(inputEvent.inputType || "").startsWith("insert");
+    const hasNonAscii = /[^\u0000-\u007f]/.test(text);
+    if (!isInsert || !hasNonAscii) {
+      return;
+    }
+    event.preventDefault();
+    desktopImeComposing = false;
+    desktopImeText = "";
+    forwardImeText(text);
+  }, true);
+
   term.textarea.addEventListener("compositionstart", () => {
     desktopImeComposing = true;
     desktopImeText = "";
@@ -150,14 +183,13 @@ function configureImeSupport() {
     if (!committedText) {
       return;
     }
-    setTimeout(() => {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        sendTerminalInput(committedText);
-      }
-      if (term.textarea) {
-        term.textarea.value = "";
-      }
-    }, 0);
+    if (desktopImeRecentlyHandled) {
+      clearImeTextarea();
+      return;
+    }
+    if (/[^\u0000-\u007f]/.test(committedText)) {
+      setTimeout(() => forwardImeText(committedText), 0);
+    }
   });
 }
 
@@ -593,7 +625,7 @@ function attachSession(session) {
 }
 
 term.onData((data) => {
-  if (desktopImeComposing) {
+  if (desktopImeComposing || desktopImeRecentlyHandled) {
     return;
   }
   if (socket && socket.readyState === WebSocket.OPEN) {
