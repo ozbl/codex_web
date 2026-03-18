@@ -2,6 +2,11 @@
 
 把本机 `codex` CLI 包成一个可通过浏览器访问的 Web 终端，并允许局域网中的其他设备连接使用。
 
+## 界面预览
+
+<img src="light.jpg" alt="浅色模式预览" width="48%" />
+<img src="night.jpg" alt="深色模式预览" width="48%" />
+
 ## 功能
 
 - 浏览器中直接运行本机 `codex` CLI
