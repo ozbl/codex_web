@@ -4,8 +4,8 @@
 
 ## 界面预览
 
-<img src="light.jpg" alt="浅色模式预览" width="48%" />
-<img src="night.jpg" alt="深色模式预览" width="48%" />
+<img src="light.jpg" alt="浅色模式预览" height="420" />
+<img src="night.jpg" alt="深色模式预览" height="420" />
 
 ## 功能
 
