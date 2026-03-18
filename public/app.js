@@ -1,7 +1,4 @@
 const THEME_KEY = "codex-web-theme";
-const LEFT_DRAWER_KEY = "codex-web-left-drawer";
-const RIGHT_DRAWER_KEY = "codex-web-right-drawer";
-const MOBILE_BREAKPOINT = 980;
 
 const terminalThemes = {
   dark: {
@@ -34,13 +31,19 @@ const terminalThemes = {
   },
 };
 
+const workspaceTitles = {
+  console: { eyebrow: "Console", title: "控制台" },
+  sessions: { eyebrow: "Sessions", title: "会话" },
+  connections: { eyebrow: "Connections", title: "连接" },
+};
+
 const initialTheme = loadThemePreference();
 document.body.dataset.theme = initialTheme;
 
 const term = new Terminal({
   cursorBlink: true,
   fontSize: 14,
-  fontFamily: 'Cascadia Code, Consolas, monospace',
+  fontFamily: "Cascadia Code, Consolas, monospace",
   theme: terminalThemes[initialTheme],
   scrollback: 5000,
 });
@@ -51,16 +54,21 @@ fitAddon.fit();
 term.focus();
 
 const els = {
-  drawerBackdrop: document.getElementById("drawerBackdrop"),
-  leftDrawer: document.getElementById("leftDrawer"),
-  rightDrawer: document.getElementById("rightDrawer"),
-  leftDrawerToggleBtn: document.getElementById("leftDrawerToggleBtn"),
-  rightDrawerToggleBtn: document.getElementById("rightDrawerToggleBtn"),
-  leftDrawerCloseBtn: document.getElementById("leftDrawerCloseBtn"),
-  rightDrawerCloseBtn: document.getElementById("rightDrawerCloseBtn"),
+  panelBackdrop: document.getElementById("panelBackdrop"),
+  workspacePopup: document.getElementById("workspacePopup"),
+  workspacePopupCloseBtn: document.getElementById("workspacePopupCloseBtn"),
+  workspacePopupEyebrow: document.getElementById("workspacePopupEyebrow"),
+  workspacePopupTitle: document.getElementById("workspacePopupTitle"),
+  fileTreePopup: document.getElementById("fileTreePopup"),
+  fileTreePopupCloseBtn: document.getElementById("fileTreePopupCloseBtn"),
+  consolePanelBtn: document.getElementById("consolePanelBtn"),
+  sessionsPanelBtn: document.getElementById("sessionsPanelBtn"),
+  connectionsPanelBtn: document.getElementById("connectionsPanelBtn"),
+  fileTreePanelBtn: document.getElementById("fileTreePanelBtn"),
+  sessionsBadge: document.getElementById("sessionsBadge"),
+  popupNavItems: Array.from(document.querySelectorAll(".popup-nav-item")),
+  popupViews: Array.from(document.querySelectorAll(".popup-view")),
   newShellBtn: document.getElementById("newShellBtn"),
-  navItems: Array.from(document.querySelectorAll(".nav-item")),
-  drawerViews: Array.from(document.querySelectorAll(".drawer-view")),
   tokenInput: document.getElementById("tokenInput"),
   cwdInput: document.getElementById("cwdInput"),
   browseDirBtn: document.getElementById("browseDirBtn"),
@@ -76,8 +84,6 @@ const els = {
   addressList: document.getElementById("addressList"),
   currentSessionLabel: document.getElementById("currentSessionLabel"),
   statusLabel: document.getElementById("statusLabel"),
-  activeSessionsStat: document.getElementById("activeSessionsStat"),
-  addressCountStat: document.getElementById("addressCountStat"),
   rootDirStat: document.getElementById("rootDirStat"),
   themeToggleBtn: document.getElementById("themeToggleBtn"),
   themeToggleIcon: document.getElementById("themeToggleIcon"),
@@ -103,7 +109,8 @@ let currentSession = null;
 let currentDirectoryBrowserPath = null;
 let currentFileTreePath = null;
 let currentFileTreeParent = null;
-let activeLeftView = "console";
+let activeWorkspaceView = "console";
+let openPanel = null;
 
 function loadThemePreference() {
   const saved = localStorage.getItem(THEME_KEY);
@@ -111,18 +118,6 @@ function loadThemePreference() {
     return saved;
   }
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-}
-
-function prefersMobileLayout() {
-  return window.innerWidth < MOBILE_BREAKPOINT;
-}
-
-function readDrawerPref(key) {
-  return localStorage.getItem(key) === "open";
-}
-
-function storeDrawerPref(key, isOpen) {
-  localStorage.setItem(key, isOpen ? "open" : "closed");
 }
 
 function applyTheme(theme) {
@@ -135,49 +130,56 @@ function applyTheme(theme) {
   setTimeout(() => fitAddon.fit(), 60);
 }
 
-function setLeftDrawerOpen(isOpen, { persist = true } = {}) {
-  document.body.classList.toggle("left-drawer-open", isOpen);
-  document.body.classList.toggle("left-drawer-closed", !isOpen);
-  els.leftDrawer.setAttribute("aria-hidden", String(!isOpen));
-  if (persist && !prefersMobileLayout()) {
-    storeDrawerPref(LEFT_DRAWER_KEY, isOpen);
-  }
-  updateBackdrop();
-  setTimeout(() => fitAddon.fit(), 80);
-}
-
-function setRightDrawerOpen(isOpen, { persist = true } = {}) {
-  document.body.classList.toggle("right-drawer-open", isOpen);
-  document.body.classList.toggle("right-drawer-closed", !isOpen);
-  els.rightDrawer.setAttribute("aria-hidden", String(!isOpen));
-  if (persist && !prefersMobileLayout()) {
-    storeDrawerPref(RIGHT_DRAWER_KEY, isOpen);
-  }
-  updateBackdrop();
-  setTimeout(() => fitAddon.fit(), 80);
+function updateTopbarTabs() {
+  els.consolePanelBtn.classList.toggle("is-active", openPanel === "workspace" && activeWorkspaceView === "console");
+  els.sessionsPanelBtn.classList.toggle("is-active", openPanel === "workspace" && activeWorkspaceView === "sessions");
+  els.connectionsPanelBtn.classList.toggle("is-active", openPanel === "workspace" && activeWorkspaceView === "connections");
+  els.fileTreePanelBtn.classList.toggle("is-active", openPanel === "filetree");
 }
 
 function updateBackdrop() {
-  const shouldShow = prefersMobileLayout() && (
-    document.body.classList.contains("left-drawer-open") ||
-    document.body.classList.contains("right-drawer-open")
-  );
-  els.drawerBackdrop.classList.toggle("hidden", !shouldShow);
+  els.panelBackdrop.classList.toggle("hidden", !openPanel);
 }
 
-function applyResponsiveDrawerDefaults() {
-  setLeftDrawerOpen(false, { persist: false });
-  setRightDrawerOpen(false, { persist: false });
+function closePanels() {
+  openPanel = null;
+  els.workspacePopup.classList.add("hidden");
+  els.workspacePopup.setAttribute("aria-hidden", "true");
+  els.fileTreePopup.classList.add("hidden");
+  els.fileTreePopup.setAttribute("aria-hidden", "true");
+  updateTopbarTabs();
+  updateBackdrop();
+  setTimeout(() => fitAddon.fit(), 40);
 }
 
-function setLeftView(view) {
-  activeLeftView = view;
-  for (const item of els.navItems) {
+function openWorkspacePanel(view) {
+  activeWorkspaceView = view;
+  const heading = workspaceTitles[view];
+  els.workspacePopupEyebrow.textContent = heading.eyebrow;
+  els.workspacePopupTitle.textContent = heading.title;
+  for (const item of els.popupNavItems) {
     item.classList.toggle("is-active", item.dataset.view === view);
   }
-  for (const panel of els.drawerViews) {
+  for (const panel of els.popupViews) {
     panel.classList.toggle("hidden", panel.dataset.viewPanel !== view);
   }
+  openPanel = "workspace";
+  els.fileTreePopup.classList.add("hidden");
+  els.fileTreePopup.setAttribute("aria-hidden", "true");
+  els.workspacePopup.classList.remove("hidden");
+  els.workspacePopup.setAttribute("aria-hidden", "false");
+  updateTopbarTabs();
+  updateBackdrop();
+}
+
+function openFileTreePanel() {
+  openPanel = "filetree";
+  els.workspacePopup.classList.add("hidden");
+  els.workspacePopup.setAttribute("aria-hidden", "true");
+  els.fileTreePopup.classList.remove("hidden");
+  els.fileTreePopup.setAttribute("aria-hidden", "false");
+  updateTopbarTabs();
+  updateBackdrop();
 }
 
 function getToken() {
@@ -416,7 +418,6 @@ async function loadFileTree(targetPath) {
 
 function renderAddresses(addresses) {
   els.addressList.innerHTML = "";
-  els.addressCountStat.textContent = String(addresses.length || 1);
 
   const list = addresses.length ? addresses : [`127.0.0.1:${config.port}`];
   for (const address of list) {
@@ -434,7 +435,7 @@ function renderAddresses(addresses) {
 function renderSessions(sessions) {
   els.sessionCount.textContent = String(sessions.length);
   els.sidebarSessionCount.textContent = String(sessions.length);
-  els.activeSessionsStat.textContent = String(sessions.filter((session) => session.status === "running").length);
+  els.sessionsBadge.textContent = String(sessions.length);
   els.sidebarSessionList.innerHTML = "";
 
   if (sessions.length === 0) {
@@ -470,7 +471,7 @@ function renderSessions(sessions) {
     `;
     card.querySelector(".attach-btn").addEventListener("click", () => {
       attachSession(session);
-      setLeftDrawerOpen(false, { persist: false });
+      closePanels();
     });
     card.querySelector(".terminate-btn").addEventListener("click", async () => {
       try {
@@ -486,14 +487,6 @@ function renderSessions(sessions) {
       }
     });
     els.sidebarSessionList.appendChild(card);
-  }
-}
-
-function connectNavActions() {
-  for (const item of els.navItems) {
-    item.addEventListener("click", () => {
-      setLeftView(item.dataset.view);
-    });
   }
 }
 
@@ -560,7 +553,7 @@ document.getElementById("terminal").addEventListener("click", () => {
 });
 
 window.addEventListener("resize", () => {
-  applyResponsiveDrawerDefaults();
+  closePanels();
   fitAddon.fit();
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
@@ -622,33 +615,52 @@ async function ensureDefaultShellSession() {
   attachSession(shellSession);
 }
 
-els.leftDrawerToggleBtn.addEventListener("click", () => {
-  setLeftDrawerOpen(!document.body.classList.contains("left-drawer-open"));
-  if (prefersMobileLayout()) {
-    setRightDrawerOpen(false, { persist: false });
+els.consolePanelBtn.addEventListener("click", () => {
+  if (openPanel === "workspace" && activeWorkspaceView === "console") {
+    closePanels();
+  } else {
+    openWorkspacePanel("console");
   }
 });
 
-els.rightDrawerToggleBtn.addEventListener("click", () => {
-  setRightDrawerOpen(!document.body.classList.contains("right-drawer-open"));
-  if (prefersMobileLayout()) {
-    setLeftDrawerOpen(false, { persist: false });
+els.sessionsPanelBtn.addEventListener("click", () => {
+  if (openPanel === "workspace" && activeWorkspaceView === "sessions") {
+    closePanels();
+  } else {
+    openWorkspacePanel("sessions");
   }
 });
 
-els.leftDrawerCloseBtn.addEventListener("click", () => setLeftDrawerOpen(false, { persist: false }));
-els.rightDrawerCloseBtn.addEventListener("click", () => setRightDrawerOpen(false, { persist: false }));
-els.drawerBackdrop.addEventListener("click", () => {
-  setLeftDrawerOpen(false, { persist: false });
-  setRightDrawerOpen(false, { persist: false });
+els.connectionsPanelBtn.addEventListener("click", () => {
+  if (openPanel === "workspace" && activeWorkspaceView === "connections") {
+    closePanels();
+  } else {
+    openWorkspacePanel("connections");
+  }
 });
+
+els.fileTreePanelBtn.addEventListener("click", () => {
+  if (openPanel === "filetree") {
+    closePanels();
+  } else {
+    openFileTreePanel();
+  }
+});
+
+for (const item of els.popupNavItems) {
+  item.addEventListener("click", () => openWorkspacePanel(item.dataset.view));
+}
+
+els.workspacePopupCloseBtn.addEventListener("click", closePanels);
+els.fileTreePopupCloseBtn.addEventListener("click", closePanels);
+els.panelBackdrop.addEventListener("click", closePanels);
 
 els.createBtn.addEventListener("click", async () => {
   try {
     if (canReuseCurrentSession()) {
       sendTerminalInput(`${buildCodexCommand()}\r`);
       printSystemLine("已在当前会话中运行 Codex。");
-      setLeftDrawerOpen(false, { persist: false });
+      closePanels();
       return;
     }
     const session = await requestJson("/api/sessions", {
@@ -661,7 +673,7 @@ els.createBtn.addEventListener("click", async () => {
     });
     await loadSessions();
     attachSession(session);
-    setLeftDrawerOpen(false, { persist: false });
+    closePanels();
   } catch (error) {
     printSystemLine(`启动失败: ${error.message}`);
   }
@@ -793,7 +805,7 @@ els.fileTreeUseBtn.addEventListener("click", () => {
   if (currentFileTreePath) {
     els.cwdInput.value = currentFileTreePath;
     syncShellCwd(currentFileTreePath);
-    setRightDrawerOpen(false, { persist: false });
+    closePanels();
   }
 });
 
@@ -812,12 +824,10 @@ els.cwdInput.addEventListener("change", () => {
 (async () => {
   try {
     applyTheme(initialTheme);
-    connectNavActions();
-    setLeftView(activeLeftView);
-    applyResponsiveDrawerDefaults();
+    closePanels();
     await loadConfig();
     await ensureDefaultShellSession();
-    printSystemLine("准备就绪。窄屏默认只显示终端，左右侧边栏可按需展开。");
+    printSystemLine("准备就绪。顶部按钮可打开控制台、会话、连接和文件树弹窗。");
   } catch (error) {
     printSystemLine(`初始化失败: ${error.message}`);
   }
