@@ -72,7 +72,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -120,7 +121,20 @@ input {
   background: var(--input-bg);
 }
 
-input:focus {
+textarea {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 15px;
+  border: 1px solid var(--line);
+  outline: none;
+  color: var(--text);
+  background: var(--input-bg);
+  resize: vertical;
+  min-height: 120px;
+}
+
+input:focus,
+textarea:focus {
   border-color: rgba(59, 130, 246, 0.3);
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 }
@@ -259,6 +273,38 @@ label span {
   color: white;
   background: #ef4444;
   box-shadow: 0 0 0 2px var(--surface);
+}
+
+.terminal-context-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 172px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-strong);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(22px);
+}
+
+.terminal-context-item {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: transparent;
+  box-shadow: none;
+  justify-content: flex-start;
+  font-weight: 600;
+}
+
+.terminal-context-item:hover {
+  background: var(--ghost-bg);
+}
+
+.terminal-context-item.danger-item {
+  color: var(--danger);
 }
 
 .root-hint,
@@ -686,6 +732,26 @@ label span {
   background: var(--surface-strong);
 }
 
+.paste-popover {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  width: min(420px, calc(100vw - 28px));
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  border-radius: 22px;
+  background: var(--surface-strong);
+}
+
+.paste-popover-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 @media (max-width: 1180px) {
   .topbar-tools {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -732,6 +798,13 @@ label span {
   .create-directory-row,
   .file-manager-create-row {
     grid-template-columns: 1fr;
+  }
+
+  .paste-popover {
+    right: 14px;
+    left: 14px;
+    bottom: 14px;
+    width: auto;
   }
 }
 
@@ -810,5 +883,11 @@ label span {
 
   #terminal {
     padding: 12px;
+  }
+
+  .paste-popover {
+    right: 10px;
+    left: 10px;
+    bottom: 10px;
   }
 }

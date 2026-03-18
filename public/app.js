@@ -58,6 +58,7 @@ term.focus();
 configureImeSupport();
 
 const els = {
+  terminal: document.getElementById("terminal"),
   panelBackdrop: document.getElementById("panelBackdrop"),
   workspacePopup: document.getElementById("workspacePopup"),
   workspacePopupCloseBtn: document.getElementById("workspacePopupCloseBtn"),
@@ -104,6 +105,15 @@ const els = {
   fileTreeRefreshBtn: document.getElementById("fileTreeRefreshBtn"),
   fileTreeNewDirInput: document.getElementById("fileTreeNewDirInput"),
   fileTreeCreateDirBtn: document.getElementById("fileTreeCreateDirBtn"),
+  terminalContextMenu: document.getElementById("terminalContextMenu"),
+  contextCopyBtn: document.getElementById("contextCopyBtn"),
+  contextPasteBtn: document.getElementById("contextPasteBtn"),
+  contextSelectAllBtn: document.getElementById("contextSelectAllBtn"),
+  contextCtrlCBtn: document.getElementById("contextCtrlCBtn"),
+  pasteFallbackModal: document.getElementById("pasteFallbackModal"),
+  closePasteModalBtn: document.getElementById("closePasteModalBtn"),
+  pasteFallbackInput: document.getElementById("pasteFallbackInput"),
+  sendPasteFallbackBtn: document.getElementById("sendPasteFallbackBtn"),
 };
 
 let config = null;
@@ -118,11 +128,133 @@ let openPanel = null;
 let desktopImeText = "";
 let desktopImeComposing = false;
 let desktopImeRecentlyHandled = false;
+let ctrlCArmUntil = 0;
+let selectionCopyTimer = null;
+let lastCopiedSelection = "";
 
 function setNodeText(node, value) {
   if (node) {
     node.textContent = value;
   }
+}
+
+async function writeClipboardText(text) {
+  if (!text) {
+    return false;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function queueSelectionCopy() {
+  const selection = term.getSelection();
+  if (!selection || selection === lastCopiedSelection) {
+    return;
+  }
+  if (selectionCopyTimer) {
+    clearTimeout(selectionCopyTimer);
+  }
+  selectionCopyTimer = setTimeout(async () => {
+    const latestSelection = term.getSelection();
+    if (!latestSelection || latestSelection === lastCopiedSelection) {
+      return;
+    }
+    if (await writeClipboardText(latestSelection)) {
+      lastCopiedSelection = latestSelection;
+    }
+  }, 120);
+}
+
+function hideTerminalContextMenu() {
+  els.terminalContextMenu.classList.add("hidden");
+  els.terminalContextMenu.setAttribute("aria-hidden", "true");
+}
+
+function openPasteFallbackModal() {
+  hideTerminalContextMenu();
+  els.pasteFallbackInput.value = "";
+  els.pasteFallbackModal.classList.remove("hidden");
+  els.pasteFallbackModal.setAttribute("aria-hidden", "false");
+  setTimeout(() => els.pasteFallbackInput.focus(), 40);
+}
+
+function closePasteFallbackModal() {
+  els.pasteFallbackModal.classList.add("hidden");
+  els.pasteFallbackModal.setAttribute("aria-hidden", "true");
+  setTimeout(() => term.focus(), 40);
+}
+
+function showTerminalContextMenu(x, y) {
+  const menu = els.terminalContextMenu;
+  menu.classList.remove("hidden");
+  menu.setAttribute("aria-hidden", "false");
+  const bounds = menu.getBoundingClientRect();
+  const left = Math.min(x, window.innerWidth - bounds.width - 12);
+  const top = Math.min(y, window.innerHeight - bounds.height - 12);
+  menu.style.left = `${Math.max(12, left)}px`;
+  menu.style.top = `${Math.max(12, top)}px`;
+}
+
+async function copyTerminalSelection() {
+  const selection = term.getSelection();
+  if (!selection) {
+    return false;
+  }
+  const copied = await writeClipboardText(selection);
+  if (copied) {
+    lastCopiedSelection = selection;
+  }
+  return copied;
+}
+
+async function pasteIntoTerminal() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      sendTerminalInput(text);
+    }
+  } catch {
+    openPasteFallbackModal();
+  }
+}
+
+function submitPasteFallback() {
+  const text = els.pasteFallbackInput.value;
+  if (!text) {
+    closePasteFallbackModal();
+    return;
+  }
+  sendTerminalInput(text);
+  closePasteFallbackModal();
+}
+
+function armCtrlC() {
+  ctrlCArmUntil = Date.now() + 1200;
+  printSystemLine("再次按 Ctrl+C 可中断当前会话");
+}
+
+function triggerCtrlC() {
+  ctrlCArmUntil = 0;
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: "signal", signal: "ctrl_c" }));
+  }
+}
+
+function handleCtrlCRequest() {
+  if (term.hasSelection()) {
+    copyTerminalSelection().catch(() => {});
+    return true;
+  }
+  if (Date.now() < ctrlCArmUntil) {
+    triggerCtrlC();
+    return true;
+  }
+  armCtrlC();
+  return true;
 }
 
 function configureImeSupport() {
@@ -196,6 +328,21 @@ function configureImeSupport() {
     }
   });
 }
+
+term.onSelectionChange(() => {
+  queueSelectionCopy();
+});
+
+term.attachCustomKeyEventHandler((event) => {
+  if (event.type !== "keydown") {
+    return true;
+  }
+  if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "c") {
+    handleCtrlCRequest();
+    return false;
+  }
+  return true;
+});
 
 function loadThemePreference() {
   const saved = localStorage.getItem(THEME_KEY);
@@ -640,10 +787,42 @@ term.onData((data) => {
 });
 
 document.getElementById("terminal").addEventListener("click", () => {
+  hideTerminalContextMenu();
   term.focus();
 });
 
+els.terminal.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+  term.focus();
+  if (term.hasSelection()) {
+    copyTerminalSelection().catch(() => {});
+  }
+  showTerminalContextMenu(event.clientX, event.clientY);
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (
+    !els.terminalContextMenu.classList.contains("hidden") &&
+    !els.terminalContextMenu.contains(event.target)
+  ) {
+    hideTerminalContextMenu();
+  }
+  if (
+    !els.pasteFallbackModal.classList.contains("hidden") &&
+    !els.pasteFallbackModal.contains(event.target) &&
+    event.target !== els.contextPasteBtn
+  ) {
+    closePasteFallbackModal();
+  }
+});
+
+window.addEventListener("blur", () => {
+  hideTerminalContextMenu();
+  ctrlCArmUntil = 0;
+});
+
 window.addEventListener("resize", () => {
+  hideTerminalContextMenu();
   closePanels();
   fitAddon.fit();
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -790,9 +969,7 @@ els.refreshBtn.addEventListener("click", () => {
 });
 
 els.ctrlCBtn.addEventListener("click", () => {
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type: "signal", signal: "ctrl_c" }));
-  }
+  handleCtrlCRequest();
 });
 
 els.stopBtn.addEventListener("click", async () => {
@@ -920,6 +1097,47 @@ els.fileTreeCreateDirBtn.addEventListener("click", async () => {
     printSystemLine(`已创建文件夹: ${created.path}`);
   } catch (error) {
     printSystemLine(`新建文件夹失败: ${error.message}`);
+  }
+});
+
+els.contextCopyBtn.addEventListener("click", async () => {
+  await copyTerminalSelection();
+  hideTerminalContextMenu();
+});
+
+els.contextPasteBtn.addEventListener("click", async () => {
+  await pasteIntoTerminal();
+  hideTerminalContextMenu();
+});
+
+els.contextSelectAllBtn.addEventListener("click", () => {
+  term.selectAll();
+  queueSelectionCopy();
+  hideTerminalContextMenu();
+});
+
+els.contextCtrlCBtn.addEventListener("click", () => {
+  handleCtrlCRequest();
+  hideTerminalContextMenu();
+});
+
+els.closePasteModalBtn.addEventListener("click", () => {
+  closePasteFallbackModal();
+});
+
+els.sendPasteFallbackBtn.addEventListener("click", () => {
+  submitPasteFallback();
+});
+
+els.pasteFallbackInput.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closePasteFallbackModal();
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    event.preventDefault();
+    submitPasteFallback();
   }
 });
 

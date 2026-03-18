@@ -222,6 +222,45 @@
       </main>
     </div>
 
+    <div id="terminalContextMenu" class="terminal-context-menu hidden" aria-hidden="true">
+      <button id="contextCopyBtn" class="terminal-context-item" type="button">
+        <i class="fa-regular fa-copy" aria-hidden="true"></i>
+        <span>复制</span>
+      </button>
+      <button id="contextPasteBtn" class="terminal-context-item" type="button">
+        <i class="fa-regular fa-paste" aria-hidden="true"></i>
+        <span>粘贴</span>
+      </button>
+      <button id="contextSelectAllBtn" class="terminal-context-item" type="button">
+        <i class="fa-solid fa-i-cursor" aria-hidden="true"></i>
+        <span>全选</span>
+      </button>
+      <button id="contextCtrlCBtn" class="terminal-context-item danger-item" type="button">
+        <i class="fa-solid fa-ban" aria-hidden="true"></i>
+        <span>发送 Ctrl+C</span>
+      </button>
+    </div>
+
+    <div id="pasteFallbackModal" class="paste-popover surface hidden" aria-hidden="true">
+      <div class="paste-popover-head">
+        <div>
+          <p class="eyebrow">Paste Helper</p>
+          <h3>粘贴到终端</h3>
+        </div>
+        <button id="closePasteModalBtn" class="ghost square-btn mini-btn" type="button" aria-label="关闭粘贴窗口">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <p class="hint">如果浏览器不允许直接读取剪贴板，请在这里按 <strong>Ctrl+V</strong>，再发送到终端。</p>
+      <textarea id="pasteFallbackInput" rows="5" placeholder="在这里粘贴内容"></textarea>
+      <div class="actions">
+        <button id="sendPasteFallbackBtn" class="inline-btn" type="button">
+          <i class="fa-regular fa-paper-plane" aria-hidden="true"></i>
+          <span>发送到终端</span>
+        </button>
+      </div>
+    </div>
+
     <div id="directoryModal" class="modal hidden" aria-hidden="true">
       <div class="modal-backdrop" data-close-modal="true"></div>
       <div class="modal-panel surface">
