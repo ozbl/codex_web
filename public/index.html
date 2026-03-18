@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codex Web Shell</title>
+    <link rel="stylesheet" href="/vendor/fontawesome/css/all.min.css" />
+    <link rel="stylesheet" href="/vendor/xterm/css/xterm.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body data-theme="dark" class="left-drawer-closed right-drawer-closed">
+    <div class="backdrop-orb orb-a"></div>
+    <div class="backdrop-orb orb-b"></div>
+    <div id="drawerBackdrop" class="drawer-backdrop hidden"></div>
+
+    <div class="app-shell">
+      <aside id="leftDrawer" class="drawer drawer-left surface" aria-hidden="true">
+        <div class="drawer-head">
+          <div class="brand">
+            <div class="brand-mark">CW</div>
+            <div class="brand-copy">
+              <p class="eyebrow">LAN Codex Workspace</p>
+              <h1>Codex Web Shell</h1>
+            </div>
+          </div>
+          <button id="leftDrawerCloseBtn" class="icon-btn ghost drawer-close" type="button" aria-label="关闭控制面板">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <nav class="nav-rail">
+          <button class="nav-item is-active" type="button" title="控制台" data-view="console">
+            <i class="fa-solid fa-terminal nav-icon" aria-hidden="true"></i>
+            <span class="nav-label">控制台</span>
+          </button>
+          <button class="nav-item" type="button" title="会话" data-view="sessions">
+            <i class="fa-regular fa-window-restore nav-icon" aria-hidden="true"></i>
+            <span class="nav-label">会话</span>
+          </button>
+          <button class="nav-item" type="button" title="连接" data-view="connections">
+            <i class="fa-solid fa-network-wired nav-icon" aria-hidden="true"></i>
+            <span class="nav-label">连接</span>
+          </button>
+        </nav>
+
+        <div class="drawer-body">
+          <section class="panel soft-panel drawer-view" data-view-panel="console">
+            <p class="eyebrow">Console</p>
+            <h2>终端优先的局域网工作台</h2>
+            <p class="hero-text">左右侧边栏默认隐藏，手机和窄屏进入时只显示中间终端，目录、会话和连接信息都按需展开。</p>
+          </section>
+
+          <section class="panel drawer-view" data-view-panel="console">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Launch Pad</p>
+                <h3>运行 Codex</h3>
+              </div>
+              <span id="sessionCount" class="pill">0</span>
+            </div>
+
+            <label>
+              <span>访问口令</span>
+              <input id="tokenInput" type="password" placeholder="如未配置可留空" />
+            </label>
+            <label>
+              <span>工作目录</span>
+              <div class="input-with-button">
+                <input id="cwdInput" type="text" />
+                <button id="browseDirBtn" class="ghost inline-btn" type="button">
+                  <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                  <span>选择目录</span>
+                </button>
+              </div>
+            </label>
+            <label>
+              <span>额外参数</span>
+              <input id="argsInput" type="text" placeholder="例如: -m gpt-5.4 --search" />
+            </label>
+
+            <p id="configHint" class="hint"></p>
+          </section>
+
+          <section class="panel drawer-view hidden" data-view-panel="sessions">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Sessions</p>
+                <h3>活动会话</h3>
+              </div>
+              <span id="sidebarSessionCount" class="pill">0</span>
+            </div>
+            <p class="hint">查看当前运行中的 PowerShell 或 Codex 会话，可重新连接或关闭。</p>
+            <div id="sidebarSessionList" class="session-list"></div>
+          </section>
+
+          <section class="panel drawer-view hidden" data-view-panel="connections">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Connections</p>
+                <h3>局域网连接</h3>
+              </div>
+            </div>
+            <p class="hint">同一局域网中的设备可以通过以下地址访问这台机器上的终端。</p>
+            <div id="addressList" class="address-list"></div>
+          </section>
+        </div>
+      </aside>
+
+      <main class="main-shell">
+        <header class="topbar surface">
+          <button id="leftDrawerToggleBtn" class="icon-btn ghost square-btn edge-toggle" type="button" aria-label="打开控制面板" title="控制面板">
+            <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+          </button>
+
+          <div class="topbar-info">
+            <div class="info-chip info-chip-accent">
+              <span class="info-label">活动会话</span>
+              <strong id="activeSessionsStat">0</strong>
+            </div>
+            <div class="info-chip">
+              <span class="info-label">局域网地址</span>
+              <strong id="addressCountStat">0</strong>
+            </div>
+            <div class="info-chip info-chip-wide">
+              <span class="info-label">工作根目录</span>
+              <strong id="rootDirStat">-</strong>
+            </div>
+          </div>
+
+          <div class="topbar-actions">
+            <button id="newShellBtn" class="icon-btn ghost square-btn" type="button" aria-label="新建 PowerShell 会话" title="新建会话">
+              <i class="fa-solid fa-square-plus" aria-hidden="true"></i>
+            </button>
+            <button id="createBtn" class="icon-btn square-btn" type="button" aria-label="在当前会话运行 Codex" title="进入 Codex">
+              <i class="fa-solid fa-play" aria-hidden="true"></i>
+            </button>
+            <button id="refreshBtn" class="icon-btn ghost square-btn" type="button" aria-label="刷新会话列表" title="刷新会话">
+              <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+            </button>
+            <button id="themeToggleBtn" class="icon-btn ghost square-btn" type="button" aria-label="切换主题" title="切换主题">
+              <i id="themeToggleIcon" class="fa-regular fa-moon" aria-hidden="true"></i>
+            </button>
+            <button id="rightDrawerToggleBtn" class="icon-btn ghost square-btn edge-toggle" type="button" aria-label="打开文件树" title="文件树">
+              <i class="fa-solid fa-folder-tree" aria-hidden="true"></i>
+            </button>
+          </div>
+        </header>
+
+        <section class="surface terminal-stage">
+          <div class="terminal-toolbar">
+            <div class="terminal-session">
+              <p class="eyebrow">Terminal Stage</p>
+              <strong id="currentSessionLabel">未连接会话</strong>
+              <span id="statusLabel" class="status">空闲</span>
+            </div>
+            <div class="actions terminal-mini-actions">
+              <button id="ctrlCBtn" class="ghost square-btn mini-btn" type="button" aria-label="发送 Ctrl+C" title="发送 Ctrl+C">
+                <i class="fa-solid fa-ban" aria-hidden="true"></i>
+              </button>
+              <button id="stopBtn" class="danger square-btn mini-btn" type="button" aria-label="关闭会话" title="关闭会话">
+                <i class="fa-solid fa-power-off" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="terminal-frame">
+            <div class="terminal-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div id="terminal"></div>
+          </div>
+        </section>
+      </main>
+
+      <aside id="rightDrawer" class="drawer drawer-right surface" aria-hidden="true">
+        <div class="drawer-head">
+          <div>
+            <p class="eyebrow">File Tree</p>
+            <h2>当前目录文件树</h2>
+          </div>
+          <button id="rightDrawerCloseBtn" class="icon-btn ghost drawer-close" type="button" aria-label="关闭文件树">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="drawer-body">
+          <div class="panel file-tree-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Current Path</p>
+                <h3>浏览目录</h3>
+              </div>
+              <button id="fileTreeRefreshBtn" class="ghost icon-btn" type="button" aria-label="刷新文件树">
+                <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="file-tree-current">
+              <strong id="fileTreeCurrentPath">-</strong>
+            </div>
+            <div class="actions">
+              <button id="fileTreeUpBtn" class="ghost inline-btn" type="button">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                <span>上一级</span>
+              </button>
+              <button id="fileTreeUseBtn" class="inline-btn" type="button">
+                <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
+                <span>设为工作目录</span>
+              </button>
+            </div>
+            <div id="fileTreeList" class="file-tree-list"></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div id="directoryModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <div class="modal-panel surface">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Directory Picker</p>
+            <h3>选择服务器目录</h3>
+          </div>
+          <button id="closeDirModalBtn" class="ghost inline-btn" type="button">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            <span>关闭</span>
+          </button>
+        </div>
+        <div class="directory-current">
+          <strong id="directoryCurrentPath">-</strong>
+        </div>
+        <div class="create-directory-row">
+          <input id="newDirNameInput" type="text" placeholder="输入新文件夹名称" />
+          <button id="createDirBtn" class="inline-btn" type="button">
+            <i class="fa-solid fa-folder-plus" aria-hidden="true"></i>
+            <span>新建文件夹</span>
+          </button>
+        </div>
+        <div class="actions">
+          <button id="dirUpBtn" class="ghost inline-btn" type="button">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>返回上级</span>
+          </button>
+          <button id="dirSelectBtn" class="inline-btn" type="button">
+            <i class="fa-solid fa-check" aria-hidden="true"></i>
+            <span>使用当前目录</span>
+          </button>
+        </div>
+        <div id="directoryList" class="directory-list"></div>
+      </div>
+    </div>
+
+    <script src="/vendor/xterm/lib/xterm.js"></script>
+    <script src="/vendor/xterm-addon-fit/lib/addon-fit.js"></script>
+    <script src="/app.js"></script>
+  </body>
+  </html>
