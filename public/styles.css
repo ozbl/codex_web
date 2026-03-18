@@ -337,19 +337,6 @@ label span {
   display: none !important;
 }
 
-.popup-nav-item {
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 14px;
-  background: var(--ghost-bg);
-  color: var(--text);
-  box-shadow: none;
-}
-
-.popup-nav-item.is-active {
-  background: linear-gradient(135deg, rgba(74, 222, 128, 0.18), rgba(125, 211, 252, 0.12));
-}
-
 .popup-body {
   display: grid;
   gap: 14px;
@@ -376,13 +363,6 @@ label span {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-}
-
-.popup-nav {
-  display: flex;
-  gap: 8px;
-  margin: 12px 0 14px;
-  flex-wrap: wrap;
 }
 
 .panel {
@@ -512,6 +492,43 @@ label span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-manager-toolbar,
+.file-manager-create,
+.file-manager-list {
+  display: grid;
+  gap: 12px;
+}
+
+.file-manager-toolbar {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.file-manager-path {
+  display: grid;
+  gap: 6px;
+}
+
+.file-manager-path strong {
+  overflow-wrap: anywhere;
+}
+
+.file-manager-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.file-manager-create {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.file-manager-create-row {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .terminal-stage {
@@ -707,7 +724,8 @@ label span {
   }
 
   .input-with-button,
-  .create-directory-row {
+  .create-directory-row,
+  .file-manager-create-row {
     grid-template-columns: 1fr;
   }
 }

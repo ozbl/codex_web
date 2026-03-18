@@ -67,7 +67,6 @@ const els = {
   connectionsPanelBtn: document.getElementById("connectionsPanelBtn"),
   fileTreePanelBtn: document.getElementById("fileTreePanelBtn"),
   sessionsBadge: document.getElementById("sessionsBadge"),
-  popupNavItems: Array.from(document.querySelectorAll(".popup-nav-item")),
   popupViews: Array.from(document.querySelectorAll(".popup-view")),
   newShellBtn: document.getElementById("newShellBtn"),
   tokenInput: document.getElementById("tokenInput"),
@@ -100,6 +99,8 @@ const els = {
   fileTreeUpBtn: document.getElementById("fileTreeUpBtn"),
   fileTreeUseBtn: document.getElementById("fileTreeUseBtn"),
   fileTreeRefreshBtn: document.getElementById("fileTreeRefreshBtn"),
+  fileTreeNewDirInput: document.getElementById("fileTreeNewDirInput"),
+  fileTreeCreateDirBtn: document.getElementById("fileTreeCreateDirBtn"),
 };
 
 let config = null;
@@ -238,9 +239,6 @@ function openWorkspacePanel(view) {
   const heading = workspaceTitles[view];
   setNodeText(els.workspacePopupEyebrow, heading.eyebrow);
   setNodeText(els.workspacePopupTitle, heading.title);
-  for (const item of els.popupNavItems) {
-    item.classList.toggle("is-active", item.dataset.view === view);
-  }
   for (const panel of els.popupViews) {
     panel.classList.toggle("hidden", panel.dataset.viewPanel !== view);
   }
@@ -732,10 +730,6 @@ els.fileTreePanelBtn.addEventListener("click", () => {
   }
 });
 
-for (const item of els.popupNavItems) {
-  item.addEventListener("click", () => openWorkspacePanel(item.dataset.view));
-}
-
 els.workspacePopupCloseBtn.addEventListener("click", closePanels);
 els.fileTreePopupCloseBtn.addEventListener("click", closePanels);
 els.panelBackdrop.addEventListener("click", closePanels);
@@ -897,6 +891,35 @@ els.fileTreeUseBtn.addEventListener("click", () => {
 els.fileTreeRefreshBtn.addEventListener("click", () => {
   loadFileTree(currentFileTreePath || els.cwdInput.value.trim())
     .catch((error) => printSystemLine(`文件树刷新失败: ${error.message}`));
+});
+
+els.fileTreeCreateDirBtn.addEventListener("click", async () => {
+  const name = els.fileTreeNewDirInput.value.trim();
+  if (!name) {
+    printSystemLine("请输入新文件夹名称");
+    return;
+  }
+  try {
+    const created = await requestJson("/api/directories", {
+      method: "POST",
+      body: JSON.stringify({
+        path: currentFileTreePath || els.cwdInput.value.trim() || config.defaultCwd,
+        name,
+      }),
+    });
+    els.fileTreeNewDirInput.value = "";
+    await loadFileTree(created.path);
+    printSystemLine(`已创建文件夹: ${created.path}`);
+  } catch (error) {
+    printSystemLine(`新建文件夹失败: ${error.message}`);
+  }
+});
+
+els.fileTreeNewDirInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    els.fileTreeCreateDirBtn.click();
+  }
 });
 
 els.cwdInput.addEventListener("change", () => {
