@@ -1,4 +1,5 @@
 const THEME_KEY = "codex-web-theme";
+const SESSION_KEY = "codex-web-current-session";
 
 const terminalThemes = {
   dark: {
@@ -41,7 +42,9 @@ const initialTheme = loadThemePreference();
 document.body.dataset.theme = initialTheme;
 
 const term = new Terminal({
-  cursorBlink: true,
+  cursorBlink: false,
+  cursorStyle: "bar",
+  cursorInactiveStyle: "none",
   fontSize: 14,
   fontFamily: "Cascadia Code, Consolas, monospace",
   theme: terminalThemes[initialTheme],
@@ -282,6 +285,11 @@ function apiHeaders() {
 function setActiveSession(session) {
   currentSession = session || null;
   currentSessionId = session?.id || null;
+  if (currentSessionId) {
+    sessionStorage.setItem(SESSION_KEY, currentSessionId);
+  } else {
+    sessionStorage.removeItem(SESSION_KEY);
+  }
   if (session) {
     setStatus(session.status === "running" ? "运行中" : `已退出 (${session.exitCode ?? "-"})`);
     if (session.cwd) {
@@ -658,7 +666,9 @@ async function loadSessions() {
   renderSessions(sessions);
   if (currentSessionId) {
     const matched = sessions.find((session) => session.id === currentSessionId);
-    if (!matched) {
+    if (matched) {
+      setActiveSession(matched);
+    } else {
       setActiveSession(null);
       disconnectSocket();
     }
@@ -678,20 +688,14 @@ async function createShellSession() {
 }
 
 async function ensureDefaultShellSession() {
+  const persistedSessionId = sessionStorage.getItem(SESSION_KEY);
   const sessions = await loadSessions();
-  if (currentSessionId) {
-    const current = sessions.find((session) => session.id === currentSessionId);
+  if (persistedSessionId) {
+    const current = sessions.find((session) => session.id === persistedSessionId);
     if (current) {
       attachSession(current);
       return;
     }
-  }
-  const runningShellSession = sessions.find(
-    (session) => session.status === "running" && session.autoStartCodex === false
-  );
-  if (runningShellSession) {
-    attachSession(runningShellSession);
-    return;
   }
   const shellSession = await createShellSession();
   await loadSessions();
@@ -779,7 +783,10 @@ els.browseDirBtn.addEventListener("click", async () => {
 });
 
 els.refreshBtn.addEventListener("click", () => {
-  loadSessions().catch((error) => printSystemLine(`刷新失败: ${error.message}`));
+  Promise.all([
+    loadSessions(),
+    currentSession ? loadFileTree(currentSession.cwd || els.cwdInput.value.trim()) : Promise.resolve(),
+  ]).catch((error) => printSystemLine(`刷新失败: ${error.message}`));
 });
 
 els.ctrlCBtn.addEventListener("click", () => {
@@ -794,6 +801,7 @@ els.stopBtn.addEventListener("click", async () => {
   }
   try {
     await requestJson(`/api/sessions/${currentSessionId}`, { method: "DELETE" });
+    sessionStorage.removeItem(SESSION_KEY);
     disconnectSocket();
     term.clear();
     setActiveSession(null);
@@ -935,6 +943,9 @@ els.cwdInput.addEventListener("change", () => {
     closePanels();
     await loadConfig();
     await ensureDefaultShellSession();
+    setInterval(() => {
+      loadSessions().catch(() => {});
+    }, 5000);
     printSystemLine("准备就绪。顶部按钮可打开控制台、会话、连接和文件树弹窗。");
   } catch (error) {
     printSystemLine(`初始化失败: ${error.message}`);

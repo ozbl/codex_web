@@ -634,10 +634,15 @@ label span {
   width: 1px !important;
   height: 1.4em !important;
   opacity: 0.01 !important;
+  color: transparent !important;
+  background: transparent !important;
+  caret-color: transparent !important;
+  outline: none !important;
   z-index: 12 !important;
 }
 
 #terminal .xterm .composition-view {
+  pointer-events: none;
   z-index: 13 !important;
 }
 

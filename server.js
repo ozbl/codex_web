@@ -293,6 +293,7 @@ function createSession({ cwd, args, autoStartCodex = true }) {
     status: "running",
     pty: terminal,
     clients: new Set(),
+    resizeController: null,
     cleanupTimer: null,
   };
 
@@ -413,6 +414,9 @@ wss.on("connection", (ws, _req, sessionId) => {
   }
 
   session.clients.add(ws);
+  if (!session.resizeController) {
+    session.resizeController = ws;
+  }
   ws.send(JSON.stringify({ type: "ready", session: publicSession(session) }));
 
   ws.on("message", (buffer) => {
@@ -421,10 +425,12 @@ wss.on("connection", (ws, _req, sessionId) => {
       if (message.type === "input") {
         session.pty.write(message.data);
       } else if (message.type === "resize") {
-        session.pty.resize(
-          Number.parseInt(message.cols, 10) || 120,
-          Number.parseInt(message.rows, 10) || 32,
-        );
+        if (session.resizeController === ws) {
+          session.pty.resize(
+            Number.parseInt(message.cols, 10) || 120,
+            Number.parseInt(message.rows, 10) || 32,
+          );
+        }
       } else if (message.type === "signal" && message.signal === "ctrl_c") {
         session.pty.write("\u0003");
       }
@@ -433,6 +439,9 @@ wss.on("connection", (ws, _req, sessionId) => {
 
   ws.on("close", () => {
     session.clients.delete(ws);
+    if (session.resizeController === ws) {
+      session.resizeController = session.clients.values().next().value || null;
+    }
     if (session.clients.size === 0 && session.status !== "running") {
       scheduleSessionCleanup(session);
     }
