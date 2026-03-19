@@ -48,7 +48,7 @@ const term = new Terminal({
   fontSize: 14,
   fontFamily: "Cascadia Code, Consolas, monospace",
   theme: terminalThemes[initialTheme],
-  scrollback: 5000,
+  scrollback: 20000,
 });
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
@@ -59,6 +59,7 @@ configureImeSupport();
 
 const els = {
   terminal: document.getElementById("terminal"),
+  terminalFrame: document.getElementById("terminalFrame"),
   panelBackdrop: document.getElementById("panelBackdrop"),
   workspacePopup: document.getElementById("workspacePopup"),
   workspacePopupCloseBtn: document.getElementById("workspacePopupCloseBtn"),
@@ -131,11 +132,75 @@ let desktopImeRecentlyHandled = false;
 let ctrlCArmUntil = 0;
 let selectionCopyTimer = null;
 let lastCopiedSelection = "";
+let lastTerminalInteractionAt = 0;
+let cursorIdleTimer = null;
+let fitFrame = 0;
+let terminalResizeObserver = null;
+
+observeTerminalLayout();
 
 function setNodeText(node, value) {
   if (node) {
     node.textContent = value;
   }
+}
+
+function syncTerminalSize() {
+  if (!els.terminalFrame || !els.terminalFrame.clientWidth || !els.terminalFrame.clientHeight) {
+    return;
+  }
+  fitAddon.fit();
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+  }
+}
+
+function scheduleTerminalFit() {
+  if (fitFrame) {
+    cancelAnimationFrame(fitFrame);
+  }
+  fitFrame = requestAnimationFrame(() => {
+    fitFrame = 0;
+    syncTerminalSize();
+  });
+}
+
+function observeTerminalLayout() {
+  if (!window.ResizeObserver || !els.terminalFrame) {
+    return;
+  }
+  terminalResizeObserver?.disconnect();
+  terminalResizeObserver = new ResizeObserver(() => {
+    scheduleTerminalFit();
+  });
+  terminalResizeObserver.observe(els.terminalFrame);
+}
+
+function syncTerminalCursorVisibility() {
+  const shouldShowCursor =
+    Date.now() - lastTerminalInteractionAt < 900 &&
+    !desktopImeComposing &&
+    els.pasteFallbackModal.classList.contains("hidden");
+  if (shouldShowCursor) {
+    term.focus();
+  } else {
+    term.blur();
+  }
+}
+
+function scheduleTerminalCursorSync(delay = 0) {
+  if (cursorIdleTimer) {
+    clearTimeout(cursorIdleTimer);
+  }
+  cursorIdleTimer = setTimeout(() => {
+    syncTerminalCursorVisibility();
+  }, delay);
+}
+
+function markTerminalInteraction() {
+  lastTerminalInteractionAt = Date.now();
+  syncTerminalCursorVisibility();
+  scheduleTerminalCursorSync(950);
 }
 
 async function writeClipboardText(text) {
@@ -179,13 +244,14 @@ function openPasteFallbackModal() {
   els.pasteFallbackInput.value = "";
   els.pasteFallbackModal.classList.remove("hidden");
   els.pasteFallbackModal.setAttribute("aria-hidden", "false");
+  scheduleTerminalCursorSync();
   setTimeout(() => els.pasteFallbackInput.focus(), 40);
 }
 
 function closePasteFallbackModal() {
   els.pasteFallbackModal.classList.add("hidden");
   els.pasteFallbackModal.setAttribute("aria-hidden", "true");
-  setTimeout(() => term.focus(), 40);
+  markTerminalInteraction();
 }
 
 function showTerminalContextMenu(x, y) {
@@ -281,6 +347,7 @@ function configureImeSupport() {
     if (!text) {
       return;
     }
+    markTerminalInteraction();
     desktopImeRecentlyHandled = true;
     sendTerminalInput(text);
     clearImeTextarea();
@@ -306,6 +373,7 @@ function configureImeSupport() {
   term.textarea.addEventListener("compositionstart", () => {
     desktopImeComposing = true;
     desktopImeText = "";
+    markTerminalInteraction();
   });
 
   term.textarea.addEventListener("compositionupdate", (event) => {
@@ -326,6 +394,7 @@ function configureImeSupport() {
     if (/[^\u0000-\u007f]/.test(committedText)) {
       setTimeout(() => forwardImeText(committedText), 0);
     }
+    scheduleTerminalCursorSync(900);
   });
 }
 
@@ -337,6 +406,7 @@ term.attachCustomKeyEventHandler((event) => {
   if (event.type !== "keydown") {
     return true;
   }
+  markTerminalInteraction();
   if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "c") {
     handleCtrlCRequest();
     return false;
@@ -359,7 +429,7 @@ function applyTheme(theme) {
   els.themeToggleIcon.className = theme === "dark" ? "fa-regular fa-sun" : "fa-regular fa-moon";
   els.themeToggleBtn.setAttribute("title", theme === "dark" ? "切到日间" : "切到夜间");
   els.themeToggleBtn.setAttribute("aria-label", theme === "dark" ? "切到日间" : "切到夜间");
-  setTimeout(() => fitAddon.fit(), 60);
+  setTimeout(() => scheduleTerminalFit(), 60);
 }
 
 function updateTopbarTabs() {
@@ -381,7 +451,7 @@ function closePanels() {
   els.fileTreePopup.setAttribute("aria-hidden", "true");
   updateTopbarTabs();
   updateBackdrop();
-  setTimeout(() => fitAddon.fit(), 40);
+  setTimeout(() => scheduleTerminalFit(), 40);
 }
 
 function openWorkspacePanel(view) {
@@ -737,10 +807,13 @@ function disconnectSocket() {
 }
 
 function attachSession(session) {
+  const isSameSession = currentSessionId === session.id;
   disconnectSocket();
   setActiveSession(session);
-  term.clear();
-  printSystemLine(`连接会话 ${session.id}`);
+  if (!isSameSession) {
+    term.clear();
+    printSystemLine(`连接会话 ${session.id}`);
+  }
 
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const wsUrl = new URL(`${protocol}//${location.host}/ws`);
@@ -752,21 +825,27 @@ function attachSession(session) {
 
   socket = new WebSocket(wsUrl);
   socket.onopen = () => {
-    fitAddon.fit();
-    term.focus();
-    socket.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+    scheduleTerminalCursorSync(120);
+    scheduleTerminalFit();
   };
   socket.onmessage = (event) => {
     const message = JSON.parse(event.data);
-    if (message.type === "output") {
+    if (message.type === "history") {
+      term.clear();
       term.write(message.data);
+      scheduleTerminalCursorSync(120);
+    } else if (message.type === "output") {
+      term.write(message.data);
+      scheduleTerminalCursorSync(120);
     } else if (message.type === "ready") {
       setActiveSession(message.session);
+      scheduleTerminalCursorSync(120);
     } else if (message.type === "exit") {
       setStatus(`已退出 (${message.exitCode ?? "-"})`);
       els.ctrlCBtn.disabled = true;
       printSystemLine(`会话已退出，退出码 ${message.exitCode ?? "-"}`);
       loadSessions().catch((error) => printSystemLine(`刷新失败: ${error.message}`));
+      scheduleTerminalCursorSync(120);
     }
   };
   socket.onclose = () => {
@@ -781,6 +860,7 @@ term.onData((data) => {
   if (desktopImeComposing || desktopImeRecentlyHandled) {
     return;
   }
+  markTerminalInteraction();
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({ type: "input", data }));
   }
@@ -788,12 +868,12 @@ term.onData((data) => {
 
 document.getElementById("terminal").addEventListener("click", () => {
   hideTerminalContextMenu();
-  term.focus();
+  markTerminalInteraction();
 });
 
 els.terminal.addEventListener("contextmenu", (event) => {
   event.preventDefault();
-  term.focus();
+  markTerminalInteraction();
   if (term.hasSelection()) {
     copyTerminalSelection().catch(() => {});
   }
@@ -819,15 +899,13 @@ document.addEventListener("pointerdown", (event) => {
 window.addEventListener("blur", () => {
   hideTerminalContextMenu();
   ctrlCArmUntil = 0;
+  scheduleTerminalCursorSync();
 });
 
 window.addEventListener("resize", () => {
   hideTerminalContextMenu();
   closePanels();
-  fitAddon.fit();
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
-  }
+  scheduleTerminalFit();
 });
 
 async function loadConfig() {
@@ -1159,11 +1237,16 @@ els.cwdInput.addEventListener("change", () => {
   try {
     applyTheme(initialTheme);
     closePanels();
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => scheduleTerminalFit()).catch(() => {});
+    }
     await loadConfig();
     await ensureDefaultShellSession();
     setInterval(() => {
       loadSessions().catch(() => {});
     }, 5000);
+    scheduleTerminalFit();
+    scheduleTerminalCursorSync(300);
     printSystemLine("准备就绪。顶部按钮可打开控制台、会话、连接和文件树弹窗。");
   } catch (error) {
     printSystemLine(`初始化失败: ${error.message}`);

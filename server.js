@@ -28,6 +28,7 @@ const DEFAULT_CODEX_ARGS = parseArgString(
   process.env.CODEX_DEFAULT_ARGS || "--no-alt-screen",
 );
 const MAX_SESSIONS = Number.parseInt(process.env.MAX_SESSIONS || "8", 10);
+const OUTPUT_BUFFER_LIMIT = Number.parseInt(process.env.OUTPUT_BUFFER_LIMIT || String(4 * 1024 * 1024), 10);
 
 const sessions = new Map();
 
@@ -293,11 +294,16 @@ function createSession({ cwd, args, autoStartCodex = true }) {
     status: "running",
     pty: terminal,
     clients: new Set(),
+    outputBuffer: "",
     resizeController: null,
     cleanupTimer: null,
   };
 
   terminal.onData((data) => {
+    session.outputBuffer = `${session.outputBuffer}${data}`;
+    if (session.outputBuffer.length > OUTPUT_BUFFER_LIMIT) {
+      session.outputBuffer = session.outputBuffer.slice(-OUTPUT_BUFFER_LIMIT);
+    }
     for (const client of session.clients) {
       if (client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify({ type: "output", data }));
@@ -418,6 +424,9 @@ wss.on("connection", (ws, _req, sessionId) => {
     session.resizeController = ws;
   }
   ws.send(JSON.stringify({ type: "ready", session: publicSession(session) }));
+  if (session.outputBuffer) {
+    ws.send(JSON.stringify({ type: "history", data: session.outputBuffer }));
+  }
 
   ws.on("message", (buffer) => {
     try {

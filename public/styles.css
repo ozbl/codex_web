@@ -68,7 +68,7 @@ body {
   margin: 0;
   color: var(--text);
   font-family: var(--font-ui);
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 button,
@@ -195,17 +195,20 @@ label span {
 
 .app-shell {
   position: relative;
-  min-height: 100vh;
+  height: 100dvh;
   padding: 18px;
+  overflow: hidden;
 }
 
 .main-shell {
   position: relative;
   width: min(100%, 1240px);
+  height: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow: hidden;
 }
 
 .topbar {
@@ -578,11 +581,13 @@ label span {
 }
 
 .terminal-stage {
-  min-height: calc(100vh - 124px);
-  display: flex;
-  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   padding: 14px;
   gap: 10px;
+  overflow: hidden;
 }
 
 .terminal-toolbar {
@@ -648,6 +653,7 @@ label span {
 .terminal-dots-lights span:nth-child(3) { background: #4ade80; }
 
 .terminal-frame {
+  position: relative;
   flex: 1;
   min-height: 0;
   border-radius: 24px;
@@ -656,18 +662,20 @@ label span {
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 30%),
     var(--terminal-bg);
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  padding: 0;
 }
 
 #terminal {
-  flex: 1;
+  width: 100%;
+  height: 100%;
   min-height: 0;
-  padding: 16px;
+  overflow: hidden;
+  padding: 12px;
 }
 
 #terminal .xterm {
   height: 100%;
+  width: 100%;
 }
 
 #terminal .xterm .xterm-helpers {
@@ -689,22 +697,37 @@ label span {
 
 #terminal .xterm .composition-view {
   pointer-events: none;
+  opacity: 0 !important;
+  color: transparent !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
   z-index: 13 !important;
 }
 
 #terminal .xterm-viewport {
-  overflow-y: auto !important;
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: rgba(100, 116, 139, 0.65) transparent;
+  scrollbar-color: rgba(100, 116, 139, 0.85) rgba(148, 163, 184, 0.08);
+  overscroll-behavior: contain;
 }
 
 #terminal .xterm-viewport::-webkit-scrollbar {
-  width: 10px;
+  width: 12px;
+}
+
+#terminal .xterm-viewport::-webkit-scrollbar-track {
+  background: rgba(148, 163, 184, 0.08);
+  border-radius: 999px;
 }
 
 #terminal .xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.52);
+  background: rgba(100, 116, 139, 0.72);
   border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .modal {
@@ -851,7 +874,8 @@ label span {
   }
 
   .terminal-stage {
-    min-height: calc(100vh - 92px);
+    flex: 1;
+    min-height: 0;
     padding: 10px;
     gap: 8px;
   }
